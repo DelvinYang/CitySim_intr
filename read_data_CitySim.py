@@ -77,23 +77,53 @@ class DataReaderCitySim(object):
 
             bounding_boxes = np.stack([x_pos, y_pos, length, width], axis=1)
 
-            dt = 1 / 30.0  # 30Hz 采样频率
+            dt = 1 / 30.0  # 30 Hz sampling frequency
 
-            # 帧间差分速度（前一帧到后一帧），末尾补一个
-            x_velocity = np.diff(x_pos) / dt
-            y_velocity = np.diff(y_pos) / dt
+            def deriv_5point(arr):
+                """First derivative using a 5-point stencil."""
+                n = len(arr)
+                d = np.zeros_like(arr, dtype=float)
+                if n >= 5:
+                    d[2:-2] = (
+                        -arr[:-4] + 8 * arr[1:-3] - 8 * arr[3:-1] + arr[4:]
+                    ) / (12 * dt)
+                    d[0] = (arr[1] - arr[0]) / dt
+                    d[1] = (arr[2] - arr[0]) / (2 * dt)
+                    d[-2] = (arr[-1] - arr[-3]) / (2 * dt)
+                    d[-1] = (arr[-1] - arr[-2]) / dt
+                elif n > 1:
+                    d[1:] = np.diff(arr) / dt
+                    d[0] = d[1]
+                return d
 
-            # 为了长度一致，在末尾补上最后一帧的速度
-            x_velocity = np.append(x_velocity, x_velocity[-1])
-            y_velocity = np.append(y_velocity, y_velocity[-1])
+            def second_deriv_5point(arr):
+                """Second derivative using a 5-point stencil."""
+                n = len(arr)
+                d2 = np.zeros_like(arr, dtype=float)
+                if n >= 5:
+                    d2[2:-2] = (
+                        -arr[:-4]
+                        + 16 * arr[1:-3]
+                        - 30 * arr[2:-2]
+                        + 16 * arr[3:-1]
+                        - arr[4:]
+                    ) / (12 * dt ** 2)
+                    d2[0] = (arr[0] - 2 * arr[1] + arr[2]) / (dt ** 2)
+                    d2[1] = (arr[0] - 2 * arr[1] + arr[2]) / (dt ** 2)
+                    d2[-2] = (arr[-3] - 2 * arr[-2] + arr[-1]) / (dt ** 2)
+                    d2[-1] = (arr[-3] - 2 * arr[-2] + arr[-1]) / (dt ** 2)
+                elif n > 2:
+                    d2[1:-1] = (arr[2:] - 2 * arr[1:-1] + arr[:-2]) / (dt ** 2)
+                    d2[0] = d2[1]
+                    d2[-1] = d2[-2]
+                return d2
 
-            # 帧间差分加速度
-            x_acceleration = np.diff(x_velocity) / dt
-            y_acceleration = np.diff(y_velocity) / dt
+            # 5-point derivative to smooth velocity and acceleration
+            x_velocity = deriv_5point(x_pos)
+            y_velocity = deriv_5point(y_pos)
 
-            # 补全最后一帧加速度
-            x_acceleration = np.append(x_acceleration, x_acceleration[-1])
-            y_acceleration = np.append(y_acceleration, y_acceleration[-1])
+            x_acceleration = second_deriv_5point(x_pos)
+            y_acceleration = second_deriv_5point(y_pos)
 
             speed_computed = np.sqrt(x_velocity ** 2 + y_velocity ** 2)  # 单位 m/s
             # ========== 原始 speed 转为 m/s ==========
