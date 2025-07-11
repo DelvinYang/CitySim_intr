@@ -58,20 +58,48 @@ for ego_id in tqdm(data_reader.id_list, desc="Processing ego_ids"):
 
                 # === 周围车特征 ===
                 ego_pos = torch.tensor([ego_state.x[0], ego_state.y[0]], dtype=torch.float)
-                svs_with_dist = []
+                ego_heading = ego_state.course_rad
+
+                dir_best = {}
                 for sv in svs_state:
                     sv_pos = torch.tensor([sv.x[0], sv.y[0]], dtype=torch.float)
-                    dist = torch.norm(sv_pos - ego_pos, p=2)
-                    sv_feat = torch.tensor(sv.lon + sv.lat, dtype=torch.float)  # [4]
-                    svs_with_dist.append((dist.item(), sv_feat))
+                    delta = sv_pos - ego_pos
+                    dist = torch.norm(delta, p=2).item()
+                    angle = torch.atan2(delta[1], delta[0]).item() - ego_heading
+                    # wrap to [-pi, pi]
+                    while angle <= -3.14159265:
+                        angle += 2 * 3.14159265
+                    while angle > 3.14159265:
+                        angle -= 2 * 3.14159265
 
-                # 排序并截断为前 8 个
-                svs_with_dist.sort(key=lambda x: x[0])
-                sv_features = [feat for _, feat in svs_with_dist[:8]]
+                    if -0.39269908 <= angle < 0.39269908:
+                        idx = 0  # front
+                    elif 0.39269908 <= angle < 1.17809725:
+                        idx = 1  # front-right
+                    elif 1.17809725 <= angle < 1.9634954:
+                        idx = 2  # right
+                    elif 1.9634954 <= angle < 2.74889357:
+                        idx = 3  # rear-right
+                    elif angle >= 2.74889357 or angle < -2.74889357:
+                        idx = 4  # rear
+                    elif -2.74889357 <= angle < -1.9634954:
+                        idx = 5  # rear-left
+                    elif -1.9634954 <= angle < -1.17809725:
+                        idx = 6  # left
+                    else:
+                        idx = 7  # front-left
 
-                # 不足 8 个补零
-                while len(sv_features) < 8:
-                    sv_features.append(torch.zeros(4))
+                    sv_feat = torch.tensor(sv.lon + sv.lat, dtype=torch.float)
+                    prev = dir_best.get(idx)
+                    if prev is None or dist < prev[0]:
+                        dir_best[idx] = (dist, sv_feat)
+
+                sv_features = []
+                for d in range(8):
+                    if d in dir_best:
+                        sv_features.append(dir_best[d][1])
+                    else:
+                        sv_features.append(torch.zeros(4))
 
                 frame_feature = torch.stack([ego_feature] + sv_features, dim=0)  # [9, 4]
                 frame_feature_list.append(frame_feature)

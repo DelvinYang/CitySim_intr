@@ -163,6 +163,7 @@ class DataReaderCitySim(object):
                           LAT_VELOCITY: v_lat,
                           LON_ACCELERATION: a_lon,
                           LAT_ACCELERATION: a_lat,
+                          COURSE_RAD: course_rad,
                                      }
             tracks.append(track_data)
             id_ = np.int64(group_id)[0]
