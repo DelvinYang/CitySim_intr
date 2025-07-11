@@ -130,7 +130,7 @@ class DataReaderCitySim(object):
             speed_values = rows[SPEED].values * MPH_TO_MPS  # mph → m/s
             # ========= 判断是否异常（默认允许最大误差 ±3m/s）=========
             speed_diff = np.abs(speed_computed - speed_values)
-            if np.mean(speed_diff) > 0.5:
+            if np.mean(speed_diff) > 3:
                 logger.warning(
                     f"Track {group_id} skipped: computed speed differs too much from recorded speed (mean_diff = {np.mean(speed_diff):.2f} m/s)")
                 continue
