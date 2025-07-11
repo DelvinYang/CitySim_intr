@@ -1,5 +1,6 @@
 from typing import List
 
+import argparse
 import torch
 from loguru import logger
 from tqdm import tqdm
@@ -8,8 +9,17 @@ from common import State
 from read_data_CitySim import DataReaderCitySim
 from scenariocitysim import ScenarioCitySim, Vehicle
 
+parser = argparse.ArgumentParser(description="Generate sequence dataset from CitySim trajectories")
+parser.add_argument("--data-path", type=str, required=True, help="Root directory of the dataset")
+parser.add_argument("--location-name", type=str, default="IntersectionA", help="Location folder name")
+parser.add_argument("--prefix-number", type=str, default="01", help="CSV prefix number")
+args = parser.parse_args()
+
 logger.info("start main")
-location_name, prefix_number, data_path = 'IntersectionA', '01', '/Users/delvin/Downloads/Citysim'
+
+location_name = args.location_name
+prefix_number = args.prefix_number
+data_path = args.data_path
 past_frames_needed = 12
 
 data_reader = DataReaderCitySim(location_name, prefix_number, data_path)
@@ -58,7 +68,7 @@ for ego_id in tqdm(data_reader.id_list, desc="Processing ego_ids"):
 
                 # === 周围车特征 ===
                 ego_pos = torch.tensor([ego_state.x[0], ego_state.y[0]], dtype=torch.float)
-                ego_heading = ego_state.course_rad
+                ego_heading = torch.tensor(ego_state.course_rad, dtype=torch.float)
 
                 # Neighbour selection based purely on relative position to the ego
                 # car. We rotate all neighbours into the ego frame and then pick

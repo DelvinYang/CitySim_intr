@@ -40,10 +40,10 @@ Refer to `AGENTS.md` for the complete list of fields and units.
 ## Running the Example
 
 `main.py` converts the CSV data into sequences and saves them as `sequence_tensor_dataset.pt`.
-Update the `location_name`, `prefix_number` and `data_path` variables in `main.py` to point to your dataset location, then run:
+Specify the data location via command-line arguments:
 
 ```bash
-python main.py
+python main.py --data-path <DATA_PATH> --location-name IntersectionA --prefix-number 01
 ```
 
 Processing progress is displayed with `tqdm` and the resulting tensor dataset is saved in the project root.
