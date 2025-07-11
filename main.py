@@ -58,20 +58,53 @@ for ego_id in tqdm(data_reader.id_list, desc="Processing ego_ids"):
 
                 # === 周围车特征 ===
                 ego_pos = torch.tensor([ego_state.x[0], ego_state.y[0]], dtype=torch.float)
-                svs_with_dist = []
+                ego_heading = ego_state.course_rad
+
+                # Neighbour selection based purely on relative position to the ego
+                # car. We rotate all neighbours into the ego frame and then pick
+                # the closest car in each of the eight sectors around the ego.
+                cos_h = torch.cos(ego_heading)
+                sin_h = torch.sin(ego_heading)
+                dir_best = {}
+
                 for sv in svs_state:
                     sv_pos = torch.tensor([sv.x[0], sv.y[0]], dtype=torch.float)
-                    dist = torch.norm(sv_pos - ego_pos, p=2)
-                    sv_feat = torch.tensor(sv.lon + sv.lat, dtype=torch.float)  # [4]
-                    svs_with_dist.append((dist.item(), sv_feat))
+                    delta = sv_pos - ego_pos
 
-                # 排序并截断为前 8 个
-                svs_with_dist.sort(key=lambda x: x[0])
-                sv_features = [feat for _, feat in svs_with_dist[:8]]
+                    # transform into ego's coordinate system
+                    local_x = cos_h * delta[0] + sin_h * delta[1]
+                    local_y = -sin_h * delta[0] + cos_h * delta[1]
+                    dist = torch.norm(delta, p=2).item()
 
-                # 不足 8 个补零
-                while len(sv_features) < 8:
-                    sv_features.append(torch.zeros(4))
+                    angle = torch.atan2(local_y, local_x).item()
+                    if -0.39269908 <= angle < 0.39269908:
+                        idx = 0  # front
+                    elif 0.39269908 <= angle < 1.17809725:
+                        idx = 1  # front-right
+                    elif 1.17809725 <= angle < 1.9634954:
+                        idx = 2  # right
+                    elif 1.9634954 <= angle < 2.74889357:
+                        idx = 3  # rear-right
+                    elif angle >= 2.74889357 or angle < -2.74889357:
+                        idx = 4  # rear
+                    elif -2.74889357 <= angle < -1.9634954:
+                        idx = 5  # rear-left
+                    elif -1.9634954 <= angle < -1.17809725:
+                        idx = 6  # left
+                    else:
+                        idx = 7  # front-left
+
+                    sv_feat = torch.tensor(sv.lon + sv.lat, dtype=torch.float)
+                    prev = dir_best.get(idx)
+                    if prev is None or dist < prev[0]:
+                        dir_best[idx] = (dist, sv_feat)
+
+                sv_features = []
+                for d in range(8):
+                    if d in dir_best:
+                        sv_features.append(dir_best[d][1])
+                    else:
+                        sv_features.append(torch.zeros(4))
 
                 frame_feature = torch.stack([ego_feature] + sv_features, dim=0)  # [9, 4]
                 frame_feature_list.append(frame_feature)

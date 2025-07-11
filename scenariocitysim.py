@@ -45,6 +45,7 @@ class ScenarioCitySim(object):
             lat_velocity = vehicle.track[LAT_VELOCITY][index]
             lon_acceleration = vehicle.track[LON_ACCELERATION][index]
             lat_acceleration = vehicle.track[LAT_ACCELERATION][index]
+            course_rad = vehicle.track[COURSE_RAD][index]
 
             x_value = [x, x_velocity, x_acceleration]
             y_value = [y, y_velocity, y_acceleration]
@@ -55,7 +56,7 @@ class ScenarioCitySim(object):
             height = vehicle.track[BBOX][index][3]
 
 
-            state_f = State(vehicle_id, x_value, y_value, lon_value, lat_value, width, height)
+            state_f = State(vehicle_id, x_value, y_value, lon_value, lat_value, width, height, course_rad)
             return state_f
         else:
             return None
